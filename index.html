@@ -1,0 +1,765 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <title>ワールドダイスター 設定判別ツール（完全版・除外機能付き）</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1" />
+  <style>
+    :root{
+      --muted:#555;
+      --border:#e6e6e6;
+      --primary:#3b82f6;
+      --accent:#f97316;
+      --radius:10px;
+      --card:#fafafa;
+      /* パステルカラー */
+      --pastel-pink: #ffd7e6;
+      --pastel-blue:  #d9eeff;
+      --pastel-yellow:#fff6d6;
+    }
+
+    html,body{height:100%; margin:0; padding:0; -webkit-text-size-adjust:100%;}
+    body{
+      font-family: -apple-system, BlinkMacSystemFont, "Hiragino Kaku Gothic ProN", "メイリオ", Meiryo, "Noto Sans JP", sans-serif;
+      color:#111;
+      padding:16px;
+      box-sizing:border-box;
+      /* 背景を赤（ピンク寄り）・青・黄のパステルグラデーションに変更 */
+      background: linear-gradient(135deg, var(--pastel-pink) 0%, var(--pastel-blue) 50%, var(--pastel-yellow) 100%);
+      -webkit-font-smoothing:antialiased;
+      -moz-osx-font-smoothing:grayscale;
+    }
+
+    h1{font-size:18px; margin:0 0 12px 0; font-weight:700;}
+    .container{max-width:980px; margin:0 auto; background: rgba(255,255,255,0.85); padding:14px; border-radius:12px; box-shadow:0 6px 18px rgba(0,0,0,0.06);}
+    .grid{
+      display:grid;
+      grid-template-columns: repeat(auto-fit,minmax(220px,1fr));
+      gap:10px;
+      align-items:start;
+    }
+    label{display:block; font-size:14px; margin-bottom:6px; color:#222;}
+    input[type="number"]{
+      width:100%;
+      padding:12px 10px;
+      font-size:16px;
+      border:1px solid var(--border);
+      border-radius:8px;
+      background:#fff;
+      box-sizing:border-box;
+      -webkit-appearance: none;
+      appearance: none;
+    }
+    .actions{display:flex; gap:10px; margin-top:12px; flex-wrap:wrap;}
+    button{
+      padding:12px 14px;
+      font-size:16px;
+      border-radius:10px;
+      border:0;
+      background:linear-gradient(90deg,var(--primary),#60a5fa);
+      color:#fff;
+      font-weight:700;
+      box-shadow:0 6px 14px rgba(59,130,246,0.12);
+      cursor:pointer;
+    }
+    button.secondary{ background:linear-gradient(90deg,#f97316,#fb923c); box-shadow:0 6px 14px rgba(249,115,22,0.12); }
+    .zone-group{border:1px solid var(--border); padding:10px; border-radius:10px; background:var(--card);}
+    .zone-group h4{margin:0 0 8px 0; font-size:15px;}
+    hr{border:none; border-top:1px solid var(--border); margin:16px 0;}
+    #result{margin-top:14px; padding:12px; background:#fff; border-radius:10px; border:1px solid var(--border); font-size:15px;}
+    table{width:100%; border-collapse:collapse; margin-top:12px; font-size:14px;}
+    th,td{border:1px solid var(--border); padding:8px 10px; text-align:center;}
+    .small{font-size:13px; color:var(--muted); margin-top:6px;}
+    .chart-wrap{margin-top:14px; display:flex; gap:12px; flex-wrap:wrap;}
+    canvas{background:#fff; border:1px solid var(--border); border-radius:10px; width:100% !important; height:auto !important;}
+
+    /* 前兆カウント用 */
+    .count-grid{display:grid; grid-template-columns: repeat(auto-fit,minmax(160px,1fr)); gap:10px; margin-top:8px;}
+    .count-card{border:1px solid var(--border); padding:10px; border-radius:10px; background:#fff; display:flex; flex-direction:column; gap:8px; align-items:stretch;}
+    .count-row{display:flex; gap:8px; align-items:center;}
+    .count-value{font-size:18px; font-weight:700; padding:8px 10px; border-radius:8px; background:var(--card); text-align:center; min-width:72px;}
+    .count-buttons{display:flex; gap:6px; flex-wrap:wrap;}
+    .btn-small{padding:8px 10px; font-size:14px; border-radius:8px; border:0; cursor:pointer; background:#e6e6e6; color:#111;}
+    .btn-inc{background:linear-gradient(90deg,#34d399,#10b981); color:#fff;}
+    .btn-reset{background:linear-gradient(90deg,#f87171,#fb7185); color:#fff;}
+
+    /* + / - buttons for numeric inputs */
+    .count-row input[type="number"]{flex:1 1 auto; margin-right:8px;}
+    .adj-buttons{display:flex; gap:6px; align-items:center;}
+    .adj-btn{padding:8px 10px; border-radius:8px; border:0; cursor:pointer; background:#e6e6e6; color:#111; font-size:14px;}
+    .adj-plus{background:linear-gradient(90deg,#34d399,#10b981); color:#fff;}
+    .adj-minus{background:linear-gradient(90deg,#f87171,#fb7185); color:#fff;}
+
+    /* exclude checkbox style */
+    .exclude-row{display:flex; align-items:center; gap:8px; margin-top:6px; font-size:13px; color:var(--muted);}
+
+    @media (max-width:480px){
+      body{padding:12px;}
+      h1{font-size:16px;}
+      input[type="number"]{padding:14px 12px; font-size:18px;}
+      button{flex:1 1 100%; text-align:center;}
+      .grid{grid-template-columns:1fr;}
+      .chart-wrap{flex-direction:column;}
+      .count-grid{grid-template-columns:1fr;}
+    }
+  </style>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+  <div class="container">
+    <h1>ワールドダイスター 設定判別ツール（完全版・除外機能付き）</h1>
+
+    <!-- 入力フォーム -->
+    <div class="grid" role="form" aria-label="入力フォーム">
+      <div>
+        <label>トータルG数（通常時＋AT）</label>
+        <input type="number" id="totalG" value="0" min="1" inputmode="numeric" />
+      </div>
+
+      <div>
+        <label>通常時G数（判定に使用）</label>
+        <input type="number" id="normalG" value="0" min="1" inputmode="numeric" />
+      </div>
+
+      <!-- ボーナス初当たり（±ボタン + 除外チェック） -->
+      <div>
+        <label>ボーナス初当たり回数</label>
+        <div class="count-row">
+          <input type="number" id="bonusHits" value="0" min="0" inputmode="numeric" />
+          <div class="adj-buttons">
+            <button class="adj-btn adj-plus" type="button" data-target="bonusHits" data-delta="1">+1</button>
+            <button class="adj-btn adj-minus" type="button" data-target="bonusHits" data-delta="-1">-1</button>
+          </div>
+        </div>
+        <div class="exclude-row">
+          <input type="checkbox" id="exclude_bonus" />
+          <label for="exclude_bonus">判別から除外</label>
+        </div>
+      </div>
+
+      <!-- CZ回数（±ボタン + 除外チェック） -->
+      <div>
+        <label>CZ回数</label>
+        <div class="count-row">
+          <input type="number" id="czCount" value="0" min="0" inputmode="numeric" />
+          <div class="adj-buttons">
+            <button class="adj-btn adj-plus" type="button" data-target="czCount" data-delta="1">+1</button>
+            <button class="adj-btn adj-minus" type="button" data-target="czCount" data-delta="-1">-1</button>
+          </div>
+        </div>
+        <div class="exclude-row">
+          <input type="checkbox" id="exclude_cz" />
+          <label for="exclude_cz">判別から除外</label>
+        </div>
+      </div>
+
+      <!-- 示唆：デフォルト（±ボタン + 除外チェック） -->
+      <div>
+        <label>示唆：デフォルト回数</label>
+        <div class="count-row">
+          <input type="number" id="hintDefault" value="0" min="0" inputmode="numeric" />
+          <div class="adj-buttons">
+            <button class="adj-btn adj-plus" type="button" data-target="hintDefault" data-delta="1">+1</button>
+            <button class="adj-btn adj-minus" type="button" data-target="hintDefault" data-delta="-1">-1</button>
+          </div>
+        </div>
+        <div class="exclude-row">
+          <input type="checkbox" id="exclude_hint" />
+          <label for="exclude_hint">判別から除外（示唆全体）</label>
+        </div>
+      </div>
+
+      <!-- 示唆：弱（±ボタン） -->
+      <div>
+        <label>示唆：弱回数</label>
+        <div class="count-row">
+          <input type="number" id="hintWeak" value="0" min="0" inputmode="numeric" />
+          <div class="adj-buttons">
+            <button class="adj-btn adj-plus" type="button" data-target="hintWeak" data-delta="1">+1</button>
+            <button class="adj-btn adj-minus" type="button" data-target="hintWeak" data-delta="-1">-1</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 示唆：強（±ボタン） -->
+      <div>
+        <label>示唆：強回数</label>
+        <div class="count-row">
+          <input type="number" id="hintStrong" value="0" min="0" inputmode="numeric" />
+          <div class="adj-buttons">
+            <button class="adj-btn adj-plus" type="button" data-target="hintStrong" data-delta="1">+1</button>
+            <button class="adj-btn adj-minus" type="button" data-target="hintStrong" data-delta="-1">-1</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 15枚ベル（±ボタン + 除外チェック） -->
+      <div>
+        <label>15枚ベル回数</label>
+        <div class="count-row">
+          <input type="number" id="bell15" value="0" min="0" inputmode="numeric" />
+          <div class="adj-buttons">
+            <button class="adj-btn adj-plus" type="button" data-target="bell15" data-delta="1">+1</button>
+            <button class="adj-btn adj-minus" type="button" data-target="bell15" data-delta="-1">-1</button>
+          </div>
+        </div>
+        <div class="exclude-row">
+          <input type="checkbox" id="exclude_bell" />
+          <label for="exclude_bell">判別から除外</label>
+        </div>
+      </div>
+    </div>
+
+    <hr />
+
+    <h2 style="font-size:16px; margin:0 0 10px 0;">ゾーン当選（改行で表示）</h2>
+
+    <div class="grid" aria-label="ゾーン当選">
+      <div class="zone-group" aria-labelledby="z100">
+        <h4 id="z100">100G</h4>
+        <label>当選回数</label>
+        <div class="count-row">
+          <input type="number" id="z100_hit" value="0" min="0" inputmode="numeric" />
+          <div class="adj-buttons">
+            <button class="adj-btn adj-plus" type="button" data-target="z100_hit" data-delta="1">+1</button>
+            <button class="adj-btn adj-minus" type="button" data-target="z100_hit" data-delta="-1">-1</button>
+          </div>
+        </div>
+        <label style="margin-top:8px;">スルー回数</label>
+        <div class="count-row">
+          <input type="number" id="z100_miss" value="0" min="0" inputmode="numeric" />
+          <div class="adj-buttons">
+            <button class="adj-btn adj-plus" type="button" data-target="z100_miss" data-delta="1">+1</button>
+            <button class="adj-btn adj-minus" type="button" data-target="z100_miss" data-delta="-1">-1</button>
+          </div>
+        </div>
+        <div class="exclude-row">
+          <input type="checkbox" id="exclude_z100" />
+          <label for="exclude_z100">判別から除外</label>
+        </div>
+      </div>
+
+      <div class="zone-group" aria-labelledby="z300">
+        <h4 id="z300">300G</h4>
+        <label>当選回数</label>
+        <div class="count-row">
+          <input type="number" id="z300_hit" value="0" min="0" inputmode="numeric" />
+          <div class="adj-buttons">
+            <button class="adj-btn adj-plus" type="button" data-target="z300_hit" data-delta="1">+1</button>
+            <button class="adj-btn adj-minus" type="button" data-target="z300_hit" data-delta="-1">-1</button>
+          </div>
+        </div>
+        <label style="margin-top:8px;">スルー回数</label>
+        <div class="count-row">
+          <input type="number" id="z300_miss" value="0" min="0" inputmode="numeric" />
+          <div class="adj-buttons">
+            <button class="adj-btn adj-plus" type="button" data-target="z300_miss" data-delta="1">+1</button>
+            <button class="adj-btn adj-minus" type="button" data-target="z300_miss" data-delta="-1">-1</button>
+          </div>
+        </div>
+        <div class="exclude-row">
+          <input type="checkbox" id="exclude_z300" />
+          <label for="exclude_z300">判別から除外</label>
+        </div>
+      </div>
+
+      <div class="zone-group" aria-labelledby="z600">
+        <h4 id="z600">600G</h4>
+        <label>当選回数</label>
+        <div class="count-row">
+          <input type="number" id="z600_hit" value="0" min="0" inputmode="numeric" />
+          <div class="adj-buttons">
+            <button class="adj-btn adj-plus" type="button" data-target="z600_hit" data-delta="1">+1</button>
+            <button class="adj-btn adj-minus" type="button" data-target="z600_hit" data-delta="-1">-1</button>
+          </div>
+        </div>
+        <label style="margin-top:8px;">スルー回数</label>
+        <div class="count-row">
+          <input type="number" id="z600_miss" value="0" min="0" inputmode="numeric" />
+          <div class="adj-buttons">
+            <button class="adj-btn adj-plus" type="button" data-target="z600_miss" data-delta="1">+1</button>
+            <button class="adj-btn adj-minus" type="button" data-target="z600_miss" data-delta="-1">-1</button>
+          </div>
+        </div>
+        <div class="exclude-row">
+          <input type="checkbox" id="exclude_z600" />
+          <label for="exclude_z600">判別から除外</label>
+        </div>
+      </div>
+    </div>
+
+    <hr />
+
+    <h2 style="font-size:16px; margin:0 0 10px 0;">前兆カウント（判別とは別）</h2>
+    <div class="count-grid" aria-label="前兆カウント">
+      <div class="count-card" id="card_red">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <strong>赤チャンス目</strong>
+          <div class="small">リセット/増加</div>
+        </div>
+        <div class="count-row">
+          <div class="count-value" id="count_red">0</div>
+          <div class="count-buttons">
+            <button class="btn-small btn-inc" type="button" data-count="red">+1</button>
+            <button class="btn-small btn-reset" type="button" data-reset="red">リセット</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="count-card" id="card_bell">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <strong>ベル</strong>
+          <div class="small">リセット/増加</div>
+        </div>
+        <div class="count-row">
+          <div class="count-value" id="count_bell">0</div>
+          <div class="count-buttons">
+            <button class="btn-small btn-inc" type="button" data-count="bell">+1</button>
+            <button class="btn-small btn-reset" type="button" data-reset="bell">リセット</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="count-card" id="card_green">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <strong>緑チャンス目</strong>
+          <div class="small">リセット/増加</div>
+        </div>
+        <div class="count-row">
+          <div class="count-value" id="count_green">0</div>
+          <div class="count-buttons">
+            <button class="btn-small btn-inc" type="button" data-count="green">+1</button>
+            <button class="btn-small btn-reset" type="button" data-reset="green">リセット</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="count-card" id="card_replay">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <strong>リプレイ</strong>
+          <div class="small">リセット/増加</div>
+        </div>
+        <div class="count-row">
+          <div class="count-value" id="count_replay">0</div>
+          <div class="count-buttons">
+            <button class="btn-small btn-inc" type="button" data-count="replay">+1</button>
+            <button class="btn-small btn-reset" type="button" data-reset="replay">リセット</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="count-card" id="card_purple">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <strong>紫チャンス目</strong>
+          <div class="small">リセット/増加</div>
+        </div>
+        <div class="count-row">
+          <div class="count-value" id="count_purple">0</div>
+          <div class="count-buttons">
+            <button class="btn-small btn-inc" type="button" data-count="purple">+1</button>
+            <button class="btn-small btn-reset" type="button" data-reset="purple">リセット</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-top:10px; display:flex; gap:8px; flex-wrap:wrap;">
+      <button class="secondary" type="button" id="resetAllCountsBtn">前兆カウントを全てリセット</button>
+      <button type="button" id="exportCountsBtn">カウントをコピー</button>
+    </div>
+
+    <hr />
+
+    <h2 style="font-size:16px; margin:0 0 10px 0;">調整パラメータ（デバッグ用）</h2>
+    <div class="grid" aria-label="調整パラメータ">
+      <div>
+        <label>σ（ボーナス）</label>
+        <input type="number" id="sigmaBonus" value="45" min="1" inputmode="numeric" />
+      </div>
+      <div>
+        <label>σ（CZ）</label>
+        <input type="number" id="sigmaCZ" value="20" min="1" inputmode="numeric" />
+      </div>
+      <div>
+        <label>σ（ベル）</label>
+        <input type="number" id="sigmaBell" value="70" min="1" inputmode="numeric" />
+      </div>
+      <div>
+        <label>重み：ボーナス（0〜5）</label>
+        <input type="number" id="wBonus" value="1.8" step="0.1" min="0" max="5" inputmode="numeric" />
+      </div>
+      <div>
+        <label>重み：CZ（0〜5）</label>
+        <input type="number" id="wCZ" value="1.2" step="0.1" min="0" max="5" inputmode="numeric" />
+      </div>
+      <div>
+        <label>重み：ベル（0〜5）</label>
+        <input type="number" id="wBell" value="1.0" step="0.1" min="0" max="5" inputmode="numeric" />
+      </div>
+      <div>
+        <label>重み：示唆（0〜5）</label>
+        <input type="number" id="wHint" value="1.6" step="0.1" min="0" max="5" inputmode="numeric" />
+      </div>
+      <div>
+        <label>重み：ゾーン（0〜5）</label>
+        <input type="number" id="wZone" value="0.5" step="0.1" min="0" max="5" inputmode="numeric" />
+      </div>
+    </div>
+
+    <div class="actions" style="margin-top:12px;">
+      <button type="button" id="analyzeBtn">判別する</button>
+      <button class="secondary" type="button" id="resetDefaultsBtn">初期値に戻す</button>
+    </div>
+
+    <div id="result" aria-live="polite"></div>
+
+    <div class="chart-wrap">
+      <div style="flex:1 1 520px;"><canvas id="probChart" width="640" height="320"></canvas></div>
+      <div style="flex:1 1 420px;"><canvas id="compChart" width="480" height="320"></canvas></div>
+    </div>
+  </div>
+
+  <script>
+    // ---------- 初期化とイベントバインド ----------
+    document.addEventListener('DOMContentLoaded', () => {
+      // +/- buttons for numeric inputs
+      document.querySelectorAll('[data-target][data-delta]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const target = btn.getAttribute('data-target');
+          const delta = Number(btn.getAttribute('data-delta')) || 0;
+          adjustNumericInput(target, delta);
+        });
+      });
+
+      // 前兆カウント buttons
+      document.querySelectorAll('[data-count]').forEach(b => {
+        b.addEventListener('click', () => incCount(b.getAttribute('data-count')));
+      });
+      document.querySelectorAll('[data-reset]').forEach(b => {
+        b.addEventListener('click', () => resetCount(b.getAttribute('data-reset')));
+      });
+      document.getElementById('resetAllCountsBtn').addEventListener('click', resetAllCounts);
+      document.getElementById('exportCountsBtn').addEventListener('click', exportCounts);
+
+      // analyze / reset defaults
+      document.getElementById('analyzeBtn').addEventListener('click', analyze);
+      document.getElementById('resetDefaultsBtn').addEventListener('click', resetDefaults);
+
+      // initialize counts display and initial analyze
+      resetAllCounts();
+      analyze();
+    });
+
+    function adjustNumericInput(id, delta){
+      const el = document.getElementById(id);
+      if (!el) return;
+      let v = Number(el.value) || 0;
+      v += delta;
+      if (v < 0) v = 0;
+      el.value = v;
+    }
+
+    // ---------- 前兆カウント ----------
+    const countKeys = ['red','bell','green','replay','purple'];
+    const counts = { red:0, bell:0, green:0, replay:0, purple:0 };
+    function getCountEl(key){ return document.getElementById('count_' + key); }
+    function updateCountDisplay(key){ const el = getCountEl(key); if (el) el.textContent = counts[key]; }
+    function incCount(key){ if (!counts.hasOwnProperty(key)) return; counts[key] += 1; updateCountDisplay(key); }
+    function resetCount(key){ if (!counts.hasOwnProperty(key)) return; counts[key] = 0; updateCountDisplay(key); }
+    function resetAllCounts(){ countKeys.forEach(k => { counts[k] = 0; updateCountDisplay(k); }); }
+    function exportCounts(){
+      const text = `前兆カウント\n赤チャンス目: ${counts.red}\nベル: ${counts.bell}\n緑チャンス目: ${counts.green}\nリプレイ: ${counts.replay}\n紫チャンス目: ${counts.purple}`;
+      navigator.clipboard?.writeText(text).then(()=> { alert('カウントをクリップボードにコピーしました'); })
+      .catch(()=> { prompt('カウントをコピーしてください（Ctrl/Cmd+C）', text); });
+    }
+
+    // ---------- 判別ロジック（対数尤度版・ゾーン対応） ----------
+    const BONUS_EXPECT = {1:306.5,2:297.1,3:284.1,4:262.1,5:257.1,6:246.6};
+    const CZ_EXPECT    = {1:180.6,2:173.8,3:168.3,4:164.9,5:163.0,6:156.0};
+    const BELL_1 = 400, BELL_6 = 200;
+    const ZONE_EXPECT = {
+      z100: {s1: 0.11, s6: 0.30},
+      z300: {s1: 0.22, s6: 0.40},
+      z600: {s1: 0.33, s6: 0.50}
+    };
+
+    function lerp(a,b,t){return a+(b-a)*t;}
+    function bellExpect(s){ return lerp(BELL_1, BELL_6, (s-1)/5); }
+    function hintProbsForSetting(s){
+  const p1=[75,20,5];
+  const p6=[50,25,25];
+
+  const t=(s-1)/5;
+  let arr=[], sum=0;
+
+  for(let i=0;i<3;i++){
+    const v=lerp(p1[i],p6[i],t);
+    arr.push(v);
+    sum+=v;
+  }
+
+  return arr.map(x=>x/sum);
+}
+    function zoneProbForSetting(zoneKey, s){
+      const z = ZONE_EXPECT[zoneKey];
+      const t = (s-1)/5;
+      return lerp(z.s1, z.s6, t);
+    }
+    function logGaussian(obs, expect, sigma){
+      const diff = obs - expect;
+      return -0.5 * (diff*diff) / (sigma*sigma) - Math.log(sigma) - 0.5*Math.log(2*Math.PI);
+    }
+    function logMultinomial(counts, probs){
+      let L = 0;
+      for(let i=0;i<3;i++){
+        const p = Math.max(probs[i], 1e-9);
+        L += counts[i] * Math.log(p);
+      }
+      return L;
+    }
+    function logBinomial(k, n, p){
+      p = Math.min(Math.max(p, 1e-9), 1-1e-9);
+      return k * Math.log(p) + (n - k) * Math.log(1 - p);
+    }
+    function logSumExp(arr){
+      const m = Math.max(...arr);
+      const s = arr.reduce((a,b)=>a+Math.exp(b-m),0);
+      return m + Math.log(s);
+    }
+
+    let probChart=null, compChart=null;
+
+    function analyze(){
+      // 入力取得
+      const totalG = Number(document.getElementById('totalG').value) || 0;
+      const normalG = Number(document.getElementById('normalG').value) || 0;
+      const bonusHits = Number(document.getElementById('bonusHits').value) || 0;
+      const czCount = Number(document.getElementById('czCount').value) || 0;
+      const hintDefault = Number(document.getElementById('hintDefault').value) || 0;
+      const hintWeak = Number(document.getElementById('hintWeak').value) || 0;
+      const hintStrong = Number(document.getElementById('hintStrong').value) || 0;
+      const bell15 = Number(document.getElementById('bell15').value) || 0;
+
+      const z100_hit = Number(document.getElementById('z100_hit').value) || 0;
+      const z100_miss = Number(document.getElementById('z100_miss').value) || 0;
+      const z300_hit = Number(document.getElementById('z300_hit').value) || 0;
+      const z300_miss = Number(document.getElementById('z300_miss').value) || 0;
+      const z600_hit = Number(document.getElementById('z600_hit').value) || 0;
+      const z600_miss = Number(document.getElementById('z600_miss').value) || 0;
+
+      if (normalG <= 0) { document.getElementById('result').textContent = '通常時G数は1以上で入力してください。'; return; }
+
+      // 調整パラメータ
+      const sigmaBonus = Number(document.getElementById('sigmaBonus').value) || 45;
+      const sigmaCZ = Number(document.getElementById('sigmaCZ').value) || 20;
+      const sigmaBell = Number(document.getElementById('sigmaBell').value) || 70;
+      let wBonus = Number(document.getElementById('wBonus').value) || 1;
+      let wCZ = Number(document.getElementById('wCZ').value) || 1;
+      let wBell = Number(document.getElementById('wBell').value) || 1;
+      let wHint = Number(document.getElementById('wHint').value) || 1;
+      let wZone = Number(document.getElementById('wZone').value) || 1;
+
+      // 除外チェックを反映（除外された項目は重みを0にする）
+      if (document.getElementById('exclude_bonus').checked) wBonus = 0;
+      if (document.getElementById('exclude_cz').checked) wCZ = 0;
+      if (document.getElementById('exclude_bell').checked) wBell = 0;
+      if (document.getElementById('exclude_hint').checked) wHint = 0;
+      const excludeZ100 = document.getElementById('exclude_z100').checked;
+      const excludeZ300 = document.getElementById('exclude_z300').checked;
+      const excludeZ600 = document.getElementById('exclude_z600').checked;
+
+      // 観測値（1/○ の ○ 部分）
+      const obsBonus = (bonusHits > 0) ? (normalG / bonusHits) : (normalG / 1);
+      const obsCZ = (czCount > 0) ? (normalG / czCount) : (normalG / 1);
+      const obsBell = (bell15 > 0) ? (totalG / bell15) : (totalG / 1);
+
+      // ゾーン観測（成功回数と試行回数）
+      const z100_k = z100_hit;
+      const z100_n = z100_hit + z100_miss;
+      const z300_k = z300_hit;
+      const z300_n = z300_hit + z300_miss;
+      const z600_k = z600_hit;
+      const z600_n = z600_hit + z600_miss;
+
+      // 各設定で対数尤度を計算（重み付き）
+      const settings = [1,2,3,4,5,6];
+      const logLikes = [];
+      const details = [];
+
+      settings.forEach(s => {
+        const expectB = BONUS_EXPECT[s];
+        const expectCZ = CZ_EXPECT[s];
+        const expectBell = bellExpect(s);
+
+        const lb = (wBonus > 0) ? logGaussian(obsBonus, expectB, sigmaBonus) : 0;
+        const lc = (wCZ > 0) ? logGaussian(obsCZ, expectCZ, sigmaCZ) : 0;
+        const lbell = (wBell > 0) ? logGaussian(obsBell, expectBell, sigmaBell) : 0;
+
+        const hintCounts = [hintDefault, hintWeak, hintStrong];
+        const hintProbs = hintProbsForSetting(s);
+        const lhint = (wHint > 0) ? logMultinomial(hintCounts, hintProbs) : 0;
+
+        const p100 = zoneProbForSetting('z100', s);
+        const p300 = zoneProbForSetting('z300', s);
+        const p600 = zoneProbForSetting('z600', s);
+
+        const lz100 = (!excludeZ100 && z100_n > 0) ? logBinomial(z100_k, z100_n, p100) : 0;
+        const lz300 = (!excludeZ300 && z300_n > 0) ? logBinomial(z300_k, z300_n, p300) : 0;
+        const lz600 = (!excludeZ600 && z600_n > 0) ? logBinomial(z600_k, z600_n, p600) : 0;
+
+        const combinedLog = (wBonus * lb) + (wCZ * lc) + (wBell * lbell) + (wHint * lhint) + (wZone * (lz100 + lz300 + lz600));
+
+        logLikes.push(combinedLog);
+        details.push({
+          s, combinedLog, lb, lc, lbell, lhint, lz100, lz300, lz600,
+          expectB, expectCZ, expectBell, p100, p300, p600
+        });
+      });
+
+      const lse = logSumExp(logLikes);
+      const probs = logLikes.map(l => Math.exp(l - lse) * 100);
+
+      const rows = details.map((d,i) => ({
+        s: d.s,
+        prob: probs[i],
+        expectB: d.expectB,
+        expectCZ: d.expectCZ,
+        expectBell: d.expectBell,
+        p100: d.p100,
+        p300: d.p300,
+        p600: d.p600,
+        lb: d.lb, lc: d.lc, lbell: d.lbell, lhint: d.lhint, lz100: d.lz100, lz300: d.lz300, lz600: d.lz600
+      })).sort((a,b)=>b.prob - a.prob);
+
+      const best = rows[0];
+
+      const resDiv = document.getElementById('result');
+      resDiv.innerHTML = `
+        <div><strong>推定設定</strong>： 設定 <strong>${best.s}</strong> （確率 ${best.prob.toFixed(1)}%）</div>
+        <div class="small" style="margin-top:6px;">
+          観測値： ボナ 1/${isFinite(obsBonus)?obsBonus.toFixed(1):'—'} 、 CZ 1/${isFinite(obsCZ)?obsCZ.toFixed(1):'—'} 、 ベル 1/${isFinite(obsBell)?obsBell.toFixed(1):'—'}
+        </div>
+
+        <table>
+          <thead><tr><th>設定</th><th>期待度(%)</th><th>ボナ期待 1/○</th><th>CZ期待 1/○</th><th>ベル期待 1/○</th><th>100G</th><th>300G</th><th>600G</th></tr></thead>
+          <tbody>
+            ${rows.map(r=>`<tr>
+              <td>${r.s}</td>
+              <td>${r.prob.toFixed(1)}%</td>
+              <td>${r.expectB.toFixed(1)}</td>
+              <td>${r.expectCZ.toFixed(1)}</td>
+              <td>${r.expectBell.toFixed(1)}</td>
+              <td>${(r.p100*100).toFixed(1)}%</td>
+              <td>${(r.p300*100).toFixed(1)}%</td>
+              <td>${(r.p600*100).toFixed(1)}%</td>
+            </tr>`).join('')}
+          </tbody>
+        </table>
+
+        <div style="margin-top:10px;">
+          <strong>ゾーン観測</strong>
+          <div class="small">100G: ${z100_k}/${z100_n} ${excludeZ100? '(除外)':''} 、 300G: ${z300_k}/${z300_n} ${excludeZ300? '(除外)':''} 、 600G: ${z600_k}/${z600_n} ${excludeZ600? '(除外)':''}</div>
+        </div>
+
+        <div style="margin-top:10px;">
+          <strong>各指標の対数尤度寄与（推定設定 ${best.s}）</strong>
+          <table>
+            <thead><tr><th>指標</th><th>対数尤度</th></tr></thead>
+            <tbody>
+              <tr><td>ボーナス</td><td>${best.lb.toFixed(3)}</td></tr>
+              <tr><td>CZ</td><td>${best.lc.toFixed(3)}</td></tr>
+              <tr><td>ベル</td><td>${best.lbell.toFixed(3)}</td></tr>
+              <tr><td>示唆（log）</td><td>${best.lhint.toFixed(3)}</td></tr>
+              <tr><td>100Gゾーン</td><td>${best.lz100.toFixed(3)}</td></tr>
+              <tr><td>300Gゾーン</td><td>${best.lz300.toFixed(3)}</td></tr>
+              <tr><td>600Gゾーン</td><td>${best.lz600.toFixed(3)}</td></tr>
+            </tbody>
+          </table>
+        </div>
+      `;
+
+      drawProbChart(rows);
+      drawCompChart(obsBonus, obsCZ, obsBell, best, z100_k, z100_n, z300_k, z300_n, z600_k, z600_n);
+    }
+
+    // ---------- グラフ描画 ----------
+    function drawProbChart(rows){
+      const labels = rows.map(r=>'設定 '+r.s);
+      const data = rows.map(r=>r.prob);
+      const ctx = document.getElementById('probChart').getContext('2d');
+      if (probChart) probChart.destroy();
+      probChart = new Chart(ctx, {
+        type:'bar',
+        data:{ labels, datasets:[{ label:'期待度(%)', data, backgroundColor: labels.map((_,i)=>i===0?'#16a34a':'#3b82f6') }] },
+        options:{ responsive:true, plugins:{ legend:{display:false} }, scales:{ y:{ beginAtZero:true, max:100 } } }
+      });
+    }
+
+    function drawCompChart(obsB, obsCZ, obsBell, best, z100_k, z100_n, z300_k, z300_n, z600_k, z600_n){
+      const labels = ['ボーナス 1/○','CZ 1/○','ベル 1/○','100G%','300G%','600G%'];
+      const obs = [
+        isFinite(obsB)?obsB:null,
+        isFinite(obsCZ)?obsCZ:null,
+        isFinite(obsBell)?obsBell:null,
+        (z100_n>0)?(z100_k / z100_n * 100):null,
+        (z300_n>0)?(z300_k / z300_n * 100):null,
+        (z600_n>0)?(z600_k / z600_n * 100):null
+      ];
+      const expect = [
+        best.expectB,
+        best.expectCZ,
+        best.expectBell,
+        best.p100 * 100,
+        best.p300 * 100,
+        best.p600 * 100
+      ];
+      const ctx = document.getElementById('compChart').getContext('2d');
+      if (compChart) compChart.destroy();
+      compChart = new Chart(ctx, {
+        type:'bar',
+        data:{ labels, datasets:[
+          { label:'観測値', data:obs, backgroundColor:'#f97316' },
+          { label:`設定 ${best.s} 期待値`, data:expect, backgroundColor:'#06b6d4' }
+        ]},
+        options:{ responsive:true, plugins:{ tooltip:{ mode:'index' } }, scales:{ y:{ beginAtZero:true } } }
+      });
+    }
+
+    // ---------- リセット ----------
+    function resetDefaults(){
+      document.getElementById('totalG').value = 0;
+      document.getElementById('normalG').value = 0;
+      document.getElementById('bonusHits').value = 0;
+      document.getElementById('czCount').value = 0;
+      document.getElementById('hintDefault').value = 0;
+      document.getElementById('hintWeak').value = 0;
+      document.getElementById('hintStrong').value = 0;
+      document.getElementById('bell15').value = 0;
+      document.getElementById('z100_hit').value = 0;
+      document.getElementById('z100_miss').value = 0;
+      document.getElementById('z300_hit').value = 0;
+      document.getElementById('z300_miss').value = 0;
+      document.getElementById('z600_hit').value = 0;
+      document.getElementById('z600_miss').value = 0;
+      document.getElementById('sigmaBonus').value = 45;
+      document.getElementById('sigmaCZ').value = 20;
+      document.getElementById('sigmaBell').value = 70;
+      document.getElementById('wBonus').value = 1.8;
+      document.getElementById('wCZ').value = 1.2;
+      document.getElementById('wBell').value = 1.0;
+      document.getElementById('wHint').value = 1.6;
+      document.getElementById('wZone').value = 0.5;
+
+      // uncheck excludes
+      ['exclude_bonus','exclude_cz','exclude_bell','exclude_hint','exclude_z100','exclude_z300','exclude_z600'].forEach(id=>{
+        const el = document.getElementById(id);
+        if (el) el.checked = false;
+      });
+
+      resetAllCounts();
+      analyze();
+    }
+  </script>
+</body>
+</html>
